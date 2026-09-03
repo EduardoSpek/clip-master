@@ -14,29 +14,8 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel();
         DataContext = _viewModel;
 
-        Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         StateChanged += MainWindow_StateChanged;
-    }
-
-    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-    {
-        if (_viewModel.IsDarkMode)
-        {
-            var darkTheme = new System.Windows.ResourceDictionary
-            {
-                Source = new Uri("pack://application:,,,/Themes/DarkTheme.xaml")
-            };
-            Resources.MergedDictionaries.Add(darkTheme);
-        }
-        else
-        {
-            var lightTheme = new System.Windows.ResourceDictionary
-            {
-                Source = new Uri("pack://application:,,,/Themes/LightTheme.xaml")
-            };
-            Resources.MergedDictionaries.Add(lightTheme);
-        }
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
