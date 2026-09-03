@@ -6,7 +6,7 @@
         Title="Clip Master" Height="680" Width="520"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource PrimaryBackground}"
-        Icon="pack://application:,,,/ClipMaster.ico"
+        Icon="pack://application:,,,/ClipMaster;component/ClipMaster.ico"
         ResizeMode="CanMinimize"
         ShowInTaskbar="True">
 
