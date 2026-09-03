@@ -65,7 +65,9 @@ public class RecordingManager : IDisposable
         var settings = _settingsService.Load();
         _cts = new CancellationTokenSource();
 
+        System.Diagnostics.Debug.WriteLine($"[ClipMaster] Starting DXGI capture {settings.Width}x{settings.Height}@{settings.Fps}fps");
         await _screenCapture.StartAsync(settings.Width, settings.Height, settings.Fps, _cts.Token);
+        System.Diagnostics.Debug.WriteLine("[ClipMaster] DXGI capture started OK");
 
         if (settings.MicrophoneEnabled && _micAudio != null)
         {
@@ -93,12 +95,18 @@ public class RecordingManager : IDisposable
 
         var wallClock = Stopwatch.StartNew();
         long encodedFrameCount = 0;
+        int loopCount = 0;
 
         while (!ct.IsCancellationRequested)
         {
             try
             {
                 var videoFrame = await _screenCapture.CaptureFrameAsync(ct);
+                bool hasVideo = videoFrame.VideoData.Length > 0;
+
+                loopCount++;
+                if (loopCount <= 5)
+                    System.Diagnostics.Debug.WriteLine($"[ClipMaster] Loop #{loopCount}: hasVideo={hasVideo}, dataLen={videoFrame.VideoData.Length}");
 
                 byte[] audioData = Array.Empty<byte>();
                 int audioSampleCount = 0;
@@ -108,8 +116,6 @@ public class RecordingManager : IDisposable
                     audioData = await _micAudio.CaptureSamplesAsync(ct);
                     audioSampleCount = audioData.Length / 2;
                 }
-
-                bool hasVideo = videoFrame.VideoData.Length > 0;
 
                 var frame = new TimestampedFrame
                 {
@@ -184,6 +190,8 @@ public class RecordingManager : IDisposable
         var settings = _settingsService.Load();
         var framesNeeded = settings.ClipDurationSeconds * settings.Fps;
         var frames = _frameBuffer.GetLastNItems(framesNeeded);
+
+        System.Diagnostics.Debug.WriteLine($"[ClipMaster] CreateInstantClip: needed={framesNeeded}, got={frames.Length}, bufferCount={_frameBuffer.Count}");
 
         if (frames.Length == 0)
         {

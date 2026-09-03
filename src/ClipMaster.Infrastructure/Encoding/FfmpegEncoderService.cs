@@ -17,6 +17,7 @@ public class FfmpegEncoderService : IVideoEncoderService
     private int _width;
     private int _height;
     private int _fps;
+    private readonly StringBuilder _stderrLog = new();
 
     public bool IsEncoding => _isEncoding;
 
@@ -38,7 +39,9 @@ public class FfmpegEncoderService : IVideoEncoderService
             _tempAudioPath = Path.Combine(Path.GetTempPath(), $"clipmaster_audio_{Guid.NewGuid():N}.raw");
         }
 
-        var args = BuildVideoArgs(outputPath, width, height, fps, includeAudio, audioSampleRate, audioChannels);
+        var args = BuildVideoArgs(outputPath, width, height, fps);
+
+        InfraLog.Write($"FFmpeg START: ffmpeg {args}");
 
         var psi = new ProcessStartInfo
         {
@@ -54,52 +57,38 @@ public class FfmpegEncoderService : IVideoEncoderService
         _ffmpegProcess = Process.Start(psi)
             ?? throw new InvalidOperationException("Falha ao iniciar FFmpeg. Verifique se ffmpeg.exe está no PATH.");
 
+        _ffmpegProcess.ErrorDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+            {
+                _stderrLog.AppendLine(e.Data);
+                System.Diagnostics.Debug.WriteLine($"[FFmpeg STDERR] {e.Data}");
+            }
+        };
+        _ffmpegProcess.BeginErrorReadLine();
+
         _videoInputStream = _ffmpegProcess.StandardInput.BaseStream;
         _isEncoding = true;
 
         return Task.CompletedTask;
     }
 
-    private string BuildVideoArgs(string outputPath, int width, int height, int fps,
-        bool includeAudio, int audioSampleRate, int audioChannels)
+    private string BuildVideoArgs(string outputPath, int width, int height, int fps)
     {
         var sb = new StringBuilder();
         sb.Append("-y ");
         sb.Append("-f rawvideo ");
-        sb.Append("-vcodec rawvideo ");
         sb.Append("-pix_fmt bgra ");
         sb.Append($"-s {width}x{height} ");
-        sb.Append($"-framerate {fps} ");
+        sb.Append($"-r {fps} ");
         sb.Append("-i pipe:0 ");
-
-        if (includeAudio)
-        {
-            sb.Append("-f s16le ");
-            sb.Append($"-ar {audioSampleRate} ");
-            sb.Append($"-ac {audioChannels} ");
-            sb.Append("-i pipe:3 ");
-        }
-
         sb.Append("-c:v libx264 ");
         sb.Append("-preset ultrafast ");
         sb.Append("-tune zerolatency ");
         sb.Append("-pix_fmt yuv420p ");
         sb.Append("-crf 18 ");
-        sb.Append("-vsync cfr ");
-
-        if (includeAudio)
-        {
-            sb.Append("-c:a aac ");
-            sb.Append("-b:a 192k ");
-            sb.Append("-shortest ");
-        }
-        else
-        {
-            sb.Append("-an ");
-        }
-
+        sb.Append("-an ");
         sb.Append($"\"{outputPath}\"");
-
         return sb.ToString();
     }
 
@@ -137,24 +126,40 @@ public class FfmpegEncoderService : IVideoEncoderService
         {
             _videoInputStream?.Flush();
             _videoInputStream?.Close();
+            _videoInputStream = null;
 
             if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
             {
-                _ffmpegProcess.StandardInput.Close();
                 var exited = _ffmpegProcess.WaitForExit(30000);
                 if (!exited)
                 {
+                    InfraLog.Write("FFmpeg: timeout, killing process");
                     _ffmpegProcess.Kill();
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            InfraLog.WriteError("FFmpeg StopEncoding", ex);
+        }
         finally
         {
+            if (_stderrLog.Length > 0)
+            {
+                InfraLog.Write($"FFmpeg STDERR: {_stderrLog}");
+            }
+
             _ffmpegProcess?.Dispose();
             _ffmpegProcess = null;
             _videoInputStream?.Dispose();
             _videoInputStream = null;
+        }
+
+        if (!string.IsNullOrEmpty(_outputPath))
+        {
+            var fileExists = File.Exists(_outputPath);
+            var fileSize = fileExists ? new FileInfo(_outputPath).Length : 0;
+            InfraLog.Write($"FFmpeg OUTPUT: {_outputPath}, exists={fileExists}, size={fileSize}");
         }
 
         if (_includeAudio && !string.IsNullOrEmpty(_tempAudioPath) && !string.IsNullOrEmpty(_outputPath))
@@ -163,7 +168,10 @@ public class FfmpegEncoderService : IVideoEncoderService
             {
                 MuxAudioVideo(_outputPath, _tempAudioPath);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                InfraLog.WriteError("FFmpeg MuxAudioVideo", ex);
+            }
             finally
             {
                 try { File.Delete(_tempAudioPath); } catch { }

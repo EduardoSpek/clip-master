@@ -22,7 +22,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _webcamTimer;
 
     private Views.WebcamOverlayWindow? _webcamWindow;
-    private Infrastructure.Capture.MfWebcamCaptureService? _webcamCapture;
+    private MfWebcamCaptureService? _webcamCapture;
     private CancellationTokenSource? _webcamCts;
 
     [ObservableProperty] private string _statusText = "Pronto";
@@ -40,16 +40,25 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public MainViewModel()
     {
+        AppLog.Write("MainViewModel constructor START");
         _settingsService = new Infrastructure.Settings.JsonSettingsService();
         _fileManager = new Infrastructure.Settings.FileManagerService();
         var settings = _settingsService.Load();
+        AppLog.Write($"Settings loaded: Fps={settings.Fps}, W={settings.Width}, H={settings.Height}, Mic={settings.MicrophoneEnabled}");
 
-        var screenCapture = new Infrastructure.Capture.DxgiScreenCaptureService();
-        var micCapture = new Infrastructure.Capture.WasapiMicCaptureService();
+        AppLog.Write("Creating DxgiScreenCaptureService...");
+        var screenCapture = new DxgiScreenCaptureService();
+        AppLog.Write("DxgiScreenCaptureService created OK");
 
+        AppLog.Write("Creating WasapiMicCaptureService...");
+        var micCapture = new WasapiMicCaptureService();
+        AppLog.Write("WasapiMicCaptureService created OK");
+
+        AppLog.Write("Creating RecordingManager...");
         _recordingManager = new RecordingManager(
             screenCapture, null, micCapture, _fileManager, _settingsService,
             () => new Infrastructure.Encoding.FfmpegEncoderService());
+        AppLog.Write("RecordingManager created OK");
 
         _recordingManager.StateChanged += OnStateChanged;
         _recordingManager.ClipSaved += OnClipSaved;
@@ -66,16 +75,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         _webcamTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _webcamTimer.Tick += WebcamTimer_Tick;
+
+        AppLog.Write("MainViewModel constructor DONE");
     }
 
     [RelayCommand]
     private async Task StartRecordingAsync()
     {
+        AppLog.Write($"StartRecordingAsync called. IsRecording={IsRecording}");
         try
         {
             if (IsRecording)
             {
+                AppLog.Write("Stopping direct recording...");
                 var path = await _recordingManager.StopDirectRecordingAsync();
+                AppLog.Write($"StopDirectRecording returned: {path}");
                 if (!string.IsNullOrEmpty(path))
                 {
                     StatusText = $"Gravação salva: {Path.GetFileName(path)}";
@@ -83,13 +97,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
             else
             {
+                AppLog.Write("Starting continuous capture...");
                 await _recordingManager.StartContinuousCaptureAsync();
+                AppLog.Write("Continuous capture started. Starting direct recording...");
                 await _recordingManager.StartDirectRecordingAsync();
+                AppLog.Write("Direct recording started OK");
                 StatusText = "Gravando...";
             }
         }
         catch (Exception ex)
         {
+            AppLog.WriteError("StartRecordingAsync", ex);
             StatusText = $"Erro: {ex.Message}";
         }
     }
@@ -97,17 +115,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task CreateClipAsync()
     {
+        AppLog.Write("CreateClipAsync called");
         try
         {
             StatusText = "Criando clipe...";
             var path = await _recordingManager.CreateInstantClipAsync();
+            AppLog.Write($"CreateInstantClip returned: '{path}'");
             if (!string.IsNullOrEmpty(path))
             {
                 StatusText = $"Clipe salvo: {Path.GetFileName(path)}";
             }
+            else
+            {
+                StatusText = "Clipe vazio - nenhum frame no buffer";
+            }
         }
         catch (Exception ex)
         {
+            AppLog.WriteError("CreateClipAsync", ex);
             StatusText = $"Erro: {ex.Message}";
         }
     }
@@ -115,6 +140,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task StartHybridAsync()
     {
+        AppLog.Write($"StartHybridAsync called. IsHybrid={IsHybridRecording}");
         try
         {
             if (IsHybridRecording)
@@ -129,14 +155,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 if (!_recordingManager.IsContinuousCaptureRunning)
                 {
+                    AppLog.Write("Starting continuous capture for hybrid...");
                     await _recordingManager.StartContinuousCaptureAsync();
                 }
+                AppLog.Write("Starting hybrid recording...");
                 await _recordingManager.StartHybridRecordingAsync();
+                AppLog.Write("Hybrid recording started OK");
                 StatusText = "Gravação híbrida ativa...";
             }
         }
         catch (Exception ex)
         {
+            AppLog.WriteError("StartHybridAsync", ex);
             StatusText = $"Erro: {ex.Message}";
         }
     }
@@ -164,6 +194,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleWebcam()
     {
+        AppLog.Write($"ToggleWebcam called. Current={IsWebcamOn}");
         IsWebcamOn = !IsWebcamOn;
 
         if (IsWebcamOn)
@@ -178,24 +209,42 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void StartWebcam()
     {
+        AppLog.Write("StartWebcam START");
         try
         {
             var settings = _settingsService.Load();
+
+            AppLog.Write("Finding FFmpeg...");
+            var ffmpegPath = FindFfmpeg();
+            AppLog.Write($"FFmpeg found: {ffmpegPath ?? "NULL"}");
+            if (ffmpegPath == null)
+            {
+                StatusText = "Webcam: FFmpeg não encontrado no PATH";
+                IsWebcamOn = false;
+                return;
+            }
+
             _webcamCts = new CancellationTokenSource();
             _webcamCapture = new MfWebcamCaptureService();
+            AppLog.Write("MfWebcamCaptureService created");
 
+            AppLog.Write("Creating WebcamOverlayWindow...");
             _webcamWindow = new Views.WebcamOverlayWindow();
             _webcamWindow.SetSize(settings.Webcam.Size);
             _webcamWindow.SetBorderColor(settings.Webcam.BorderColor);
             _webcamWindow.Show();
+            AppLog.Write("WebcamOverlayWindow shown");
 
-            _webcamCapture.StartAsync(320, 240, _webcamCts.Token).Wait(2000);
+            AppLog.Write("Starting webcam capture 320x240...");
+            _webcamCapture.StartAsync(320, 240, _webcamCts.Token).Wait(3000);
+            AppLog.Write($"Webcam IsCapturing={_webcamCapture.IsCapturing}");
+
             _webcamTimer.Start();
-
             StatusText = "Webcam ligada";
         }
         catch (Exception ex)
         {
+            AppLog.WriteError("StartWebcam", ex);
             StatusText = $"Erro webcam: {ex.Message}";
             StopWebcam();
         }
@@ -204,28 +253,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void StopWebcam()
     {
         _webcamTimer.Stop();
-
         _webcamCts?.Cancel();
         _webcamCts?.Dispose();
         _webcamCts = null;
-
         _webcamCapture?.Stop();
         _webcamCapture?.Dispose();
         _webcamCapture = null;
-
         if (_webcamWindow != null)
         {
             _webcamWindow.Close();
             _webcamWindow = null;
         }
-
-        StatusText = "Webcam desligada";
     }
 
     private async void WebcamTimer_Tick(object? sender, EventArgs e)
     {
         if (_webcamCapture == null || _webcamWindow == null) return;
-
         try
         {
             if (_webcamCapture.IsCapturing)
@@ -244,6 +287,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task ToggleMicrophoneAsync()
     {
+        AppLog.Write($"ToggleMicrophone called. Current={IsMicOn}");
         try
         {
             IsMicOn = !IsMicOn;
@@ -253,9 +297,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             if (IsMicOn)
             {
+                AppLog.Write("Enabling microphone...");
                 if (_recordingManager.IsContinuousCaptureRunning)
                 {
+                    AppLog.Write("Recording running, enabling mic now...");
                     await _recordingManager.EnableMicrophoneAsync();
+                }
+                else
+                {
+                    AppLog.Write("Recording not running, mic will start when recording begins");
                 }
                 StatusText = "Microfone ligado";
             }
@@ -267,9 +317,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 }
                 StatusText = "Microfone desligado";
             }
+            AppLog.Write($"ToggleMicrophone DONE. IsMicOn={IsMicOn}");
         }
         catch (Exception ex)
         {
+            AppLog.WriteError("ToggleMicrophone", ex);
             IsMicOn = false;
             StatusText = $"Erro microfone: {ex.Message}";
         }
@@ -336,6 +388,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnStateChanged(object? sender, RecordingState state)
     {
+        AppLog.Write($"OnStateChanged: {state}");
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             IsRecording = state == RecordingState.Recording;
@@ -349,6 +402,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnClipSaved(object? sender, string path)
     {
+        AppLog.Write($"OnClipSaved: {path}");
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             LastClipPath = path;
@@ -359,6 +413,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnError(object? sender, string error)
     {
+        AppLog.Write($"OnError: {error}");
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             StatusText = error;
@@ -371,6 +426,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             RecordingTime = time.ToString(@"hh\:mm\:ss");
         });
+    }
+
+    private static string? FindFfmpeg()
+    {
+        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        foreach (var dir in path.Split(';'))
+        {
+            var ffmpegPath = Path.Combine(dir.Trim(), "ffmpeg.exe");
+            if (File.Exists(ffmpegPath)) return ffmpegPath;
+        }
+        return null;
     }
 
     public void Dispose()
