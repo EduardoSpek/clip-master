@@ -1,0 +1,241 @@
+<Window x:Class="ClipMaster.Presentation.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:ClipMaster.Presentation.ViewModels"
+        Title="Configurações - Clip Master" Height="720" Width="560"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PrimaryBackground}"
+        ResizeMode="NoResize">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="⚙️ Configurações" FontSize="22" FontWeight="Bold"
+                   Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,16"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- General Settings -->
+                <Border Style="{DynamicResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="GERAL" Style="{DynamicResource SectionTitle}"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="FPS" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
+                                <ComboBox SelectedIndex="0" Background="{DynamicResource InputBackground}"
+                                          Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}">
+                                    <ComboBoxItem Content="30 FPS"/>
+                                    <ComboBoxItem Content="60 FPS"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Resolução" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
+                                <ComboBox SelectedIndex="0" Background="{DynamicResource InputBackground}"
+                                          Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}">
+                                    <ComboBoxItem Content="720p (1280x720)"/>
+                                    <ComboBoxItem Content="1080p (1920x1080)"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Duração do Clipe (seg)" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
+                                <TextBox Text="{Binding ClipDurationSeconds}" Background="{DynamicResource InputBackground}"
+                                         Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                         Padding="8,6" FontSize="13"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Limite Gravação Direta (min)" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
+                                <TextBox Text="{Binding DirectRecordingLimitMinutes}" Background="{DynamicResource InputBackground}"
+                                         Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                         Padding="8,6" FontSize="13"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Audio Settings -->
+                <Border Style="{DynamicResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="ÁUDIO" Style="{DynamicResource SectionTitle}"/>
+                        <CheckBox IsChecked="{Binding MicrophoneEnabled}" Content="Ativar microfone"
+                                  Foreground="{DynamicResource TextPrimary}" FontSize="13"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Webcam Settings -->
+                <Border Style="{DynamicResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="WEBCAM" Style="{DynamicResource SectionTitle}"/>
+
+                        <CheckBox IsChecked="{Binding WebcamEnabled}" Content="Ativar webcam"
+                                  Foreground="{DynamicResource TextPrimary}" FontSize="13" Margin="0,0,0,12"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Tamanho" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
+                                <TextBox Text="{Binding WebcamSize}" Background="{DynamicResource InputBackground}"
+                                         Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                         Padding="8,6" FontSize="13"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Espessura Borda" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
+                                <TextBox Text="{Binding WebcamBorderThickness}" Background="{DynamicResource InputBackground}"
+                                         Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                         Padding="8,6" FontSize="13"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Margin="0,12,0,0">
+                            <TextBlock Text="Cor da Borda" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding WebcamBorderColor}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="13"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Hotkey Settings -->
+                <Border Style="{DynamicResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="HOTKEYS" Style="{DynamicResource SectionTitle}"/>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Iniciar/Parar Gravação" Foreground="{DynamicResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Text="{Binding HotkeyStartStop}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="12"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Clipar (Instant Replay)" Foreground="{DynamicResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Text="{Binding HotkeyClip}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="12"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Clipar + Continuar" Foreground="{DynamicResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Text="{Binding HotkeyClipContinue}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="12"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Minimizar/Restaurar" Foreground="{DynamicResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Text="{Binding HotkeyMinimize}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="12"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Ligar/Desligar Webcam" Foreground="{DynamicResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Text="{Binding HotkeyWebcam}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="12"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Ligar/Desligar Microfone" Foreground="{DynamicResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Text="{Binding HotkeyMic}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="12"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Abrir Pasta Output" Foreground="{DynamicResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Text="{Binding HotkeyOutput}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="12"/>
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Fechar Programa" Foreground="{DynamicResource TextPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Text="{Binding HotkeyClose}" Background="{DynamicResource InputBackground}"
+                                     Foreground="{DynamicResource TextPrimary}" BorderBrush="{DynamicResource BorderColor}"
+                                     Padding="8,6" FontSize="12"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Resetar Padrões" Command="{Binding ResetDefaultsCommand}"
+                    Style="{DynamicResource SecondaryButton}" Margin="0,0,12,0"/>
+            <Button Content="Salvar" Command="{Binding SaveCommand}"
+                    Style="{DynamicResource ModernButton}"
+                    Click="SaveButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
