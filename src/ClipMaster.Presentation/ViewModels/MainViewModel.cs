@@ -118,7 +118,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
             else
             {
-                await _recordingManager.StartContinuousCaptureAsync();
+                if (!_recordingManager.IsContinuousCaptureRunning)
+                {
+                    await _recordingManager.StartContinuousCaptureAsync();
+                }
                 await _recordingManager.StartHybridRecordingAsync();
                 StatusText = "Gravação híbrida ativa...";
             }
@@ -157,13 +160,30 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void ToggleMicrophone()
+    private async Task ToggleMicrophoneAsync()
     {
-        IsMicOn = !IsMicOn;
-        var settings = _settingsService.Load();
-        settings.MicrophoneEnabled = IsMicOn;
-        _settingsService.Save(settings);
-        StatusText = IsMicOn ? "Microfone ligado" : "Microfone desligado";
+        try
+        {
+            IsMicOn = !IsMicOn;
+            var settings = _settingsService.Load();
+            settings.MicrophoneEnabled = IsMicOn;
+            _settingsService.Save(settings);
+
+            if (_recordingManager.IsContinuousCaptureRunning)
+            {
+                if (IsMicOn)
+                    await _recordingManager.EnableMicrophoneAsync();
+                else
+                    _recordingManager.DisableMicrophone();
+            }
+
+            StatusText = IsMicOn ? "Microfone ligado" : "Microfone desligado";
+        }
+        catch (Exception ex)
+        {
+            IsMicOn = false;
+            StatusText = $"Erro microfone: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -230,6 +250,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             IsRecording = state == RecordingState.Recording;
             IsDirectRecording = state == RecordingState.Recording;
+            if (state == RecordingState.Idle)
+            {
+                IsHybridRecording = false;
+            }
         });
     }
 

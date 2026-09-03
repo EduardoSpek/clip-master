@@ -92,9 +92,37 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button Grid.Column="0" Content="&#x1F534; Gravar"
+                            <Button Grid.Column="0"
                                     Command="{Binding StartRecordingCommand}"
-                                    Style="{DynamicResource ModernButton}"/>
+                                    Style="{DynamicResource ModernButton}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="&#x1F534;"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                                        <Setter Property="Text" Value="&#x23F9;"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock FontSize="13" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                                <Setter Property="Text" Value="Gravar"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                                        <Setter Property="Text" Value="Parar"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Button>
 
                             <Button Grid.Column="2" Content="&#x1F4CB; Clipar"
                                     Command="{Binding CreateClipCommand}"
@@ -107,9 +135,37 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button Grid.Column="0" Content="&#x1F3AC; H&#x00ED;brido"
-                                    Command="{Binding StartHybridAsync}"
-                                    Style="{DynamicResource SecondaryButton}"/>
+                            <Button Grid.Column="0"
+                                    Command="{Binding StartHybridCommand}"
+                                    Style="{DynamicResource SecondaryButton}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="&#x1F3AC;"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsHybridRecording}" Value="True">
+                                                        <Setter Property="Text" Value="&#x23F9;"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock FontSize="12" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                                <Setter Property="Text" Value="H&#x00ED;brido"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsHybridRecording}" Value="True">
+                                                        <Setter Property="Text" Value="Parar H&#x00ED;brido"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Button>
 
                             <Button Grid.Column="2" Content="&#x2702;&#xFE0F; Clipar Direto"
                                     Command="{Binding ClipAndContinueCommand}"

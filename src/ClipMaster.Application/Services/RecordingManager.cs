@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ClipMaster.Domain.Entities;
 using ClipMaster.Domain.Enums;
 using ClipMaster.Domain.Interfaces;
@@ -25,10 +26,11 @@ public class RecordingManager : IDisposable
     private IVideoEncoderService? _directEncoder;
     private DateTime _directRecordingStartTime;
 
-    private readonly object _lock = new();
+    private bool _isContinuousCaptureRunning;
 
     public RecordingState State { get; private set; } = RecordingState.Idle;
     public Recording? CurrentRecording => _currentRecording;
+    public bool IsContinuousCaptureRunning => _isContinuousCaptureRunning;
     public event EventHandler<RecordingState>? StateChanged;
     public event EventHandler<string>? ClipSaved;
     public event EventHandler<string>? ErrorOccurred;
@@ -58,7 +60,7 @@ public class RecordingManager : IDisposable
 
     public async Task StartContinuousCaptureAsync()
     {
-        if (State != RecordingState.Idle) return;
+        if (_isContinuousCaptureRunning) return;
 
         var settings = _settingsService.Load();
 
@@ -73,6 +75,8 @@ public class RecordingManager : IDisposable
 
         _captureTask = Task.Run(() => CaptureLoopAsync(_cts.Token));
 
+        _isContinuousCaptureRunning = true;
+
         State = RecordingState.Recording;
         StateChanged?.Invoke(this, State);
     }
@@ -80,12 +84,13 @@ public class RecordingManager : IDisposable
     private async Task CaptureLoopAsync(CancellationToken ct)
     {
         var settings = _settingsService.Load();
-        var frameInterval = 1000.0 / settings.Fps;
+        var frameIntervalMs = 1000.0 / settings.Fps;
+
+        var wallClock = Stopwatch.StartNew();
+        long frameIndex = 0;
 
         while (!ct.IsCancellationRequested)
         {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-
             try
             {
                 var videoFrame = await _screenCapture.CaptureFrameAsync(ct);
@@ -93,7 +98,7 @@ public class RecordingManager : IDisposable
                 byte[] audioData = Array.Empty<byte>();
                 int audioSampleCount = 0;
 
-                if (settings.MicrophoneEnabled && _micAudio != null && _micAudio.IsCapturing)
+                if (_micAudio != null && _micAudio.IsCapturing)
                 {
                     audioData = await _micAudio.CaptureSamplesAsync(ct);
                     audioSampleCount = audioData.Length / 2;
@@ -144,18 +149,21 @@ public class RecordingManager : IDisposable
 
                     RecordingTimeUpdated?.Invoke(this, DateTime.Now - _directRecordingStartTime);
                 }
+
+                frameIndex++;
+                var expectedMs = frameIndex * frameIntervalMs;
+                var actualMs = wallClock.ElapsedMilliseconds;
+                var sleepMs = (int)(expectedMs - actualMs);
+
+                if (sleepMs > 0)
+                {
+                    await Task.Delay(sleepMs, ct).ConfigureAwait(false);
+                }
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
                 ErrorOccurred?.Invoke(this, $"Erro na captura: {ex.Message}");
-            }
-
-            sw.Stop();
-            var delay = frameInterval - sw.ElapsedMilliseconds;
-            if (delay > 0)
-            {
-                await Task.Delay((int)delay, ct).ConfigureAwait(false);
             }
         }
     }
@@ -215,8 +223,6 @@ public class RecordingManager : IDisposable
 
     public async Task StartDirectRecordingAsync()
     {
-        if (State != RecordingState.Idle) return;
-
         var settings = _settingsService.Load();
         var outputPath = _fileManager.GenerateRecordingPath();
 
@@ -265,6 +271,15 @@ public class RecordingManager : IDisposable
             _currentRecording.State = RecordingState.Idle;
         }
 
+        if (_isContinuousCaptureRunning)
+        {
+            _cts?.Cancel();
+            _captureTask?.Wait(2000);
+            _isContinuousCaptureRunning = false;
+            _screenCapture.Stop();
+            _micAudio?.Stop();
+        }
+
         State = RecordingState.Idle;
         StateChanged?.Invoke(this, State);
 
@@ -273,8 +288,6 @@ public class RecordingManager : IDisposable
 
     public async Task StartHybridRecordingAsync()
     {
-        if (State != RecordingState.Idle) return;
-
         var settings = _settingsService.Load();
         var outputPath = _fileManager.GenerateHybridPath();
 
@@ -378,10 +391,33 @@ public class RecordingManager : IDisposable
             _currentRecording.State = RecordingState.Idle;
         }
 
+        if (_isContinuousCaptureRunning)
+        {
+            _cts?.Cancel();
+            _captureTask?.Wait(2000);
+            _isContinuousCaptureRunning = false;
+            _screenCapture.Stop();
+            _micAudio?.Stop();
+        }
+
         State = RecordingState.Idle;
         StateChanged?.Invoke(this, State);
 
         return outputPath;
+    }
+
+    public async Task EnableMicrophoneAsync()
+    {
+        if (_micAudio == null) return;
+        if (_micAudio.IsCapturing) return;
+
+        var ct = _cts?.Token ?? CancellationToken.None;
+        await _micAudio.StartAsync(44100, 1, ct);
+    }
+
+    public void DisableMicrophone()
+    {
+        _micAudio?.Stop();
     }
 
     public void StopAll()
@@ -391,6 +427,7 @@ public class RecordingManager : IDisposable
 
         _isDirectRecording = false;
         _isHybridMode = false;
+        _isContinuousCaptureRunning = false;
 
         _directEncoder?.Dispose();
         _directEncoder = null;

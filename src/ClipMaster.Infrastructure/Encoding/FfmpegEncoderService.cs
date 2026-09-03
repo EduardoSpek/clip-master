@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Pipes;
 using System.Text;
 using ClipMaster.Domain.Interfaces;
 
@@ -8,10 +9,15 @@ public class FfmpegEncoderService : IVideoEncoderService
 {
     private Process? _ffmpegProcess;
     private Stream? _videoInputStream;
-    private Stream? _audioInputStream;
     private bool _isEncoding;
-    private readonly object _videoLock = new();
-    private readonly object _audioLock = new();
+    private string? _outputPath;
+    private string? _tempAudioPath;
+    private bool _includeAudio;
+    private int _audioSampleRate;
+    private int _audioChannels;
+    private int _width;
+    private int _height;
+    private int _fps;
 
     public bool IsEncoding => _isEncoding;
 
@@ -20,8 +26,33 @@ public class FfmpegEncoderService : IVideoEncoderService
     {
         if (_isEncoding) return Task.CompletedTask;
 
-        var args = BuildFfmpegArgs(outputPath, width, height, fps, includeAudio, audioSampleRate, audioChannels);
+        _outputPath = outputPath;
+        _width = width;
+        _height = height;
+        _fps = fps;
+        _includeAudio = includeAudio;
+        _audioSampleRate = audioSampleRate;
+        _audioChannels = audioChannels;
 
+        if (includeAudio)
+        {
+            _tempAudioPath = Path.Combine(Path.GetTempPath(), $"clipmaster_audio_{Guid.NewGuid():N}.raw");
+            var args = BuildVideoOnlyArgs(outputPath, width, height, fps);
+            StartProcess(args);
+        }
+        else
+        {
+            var args = BuildVideoOnlyArgs(outputPath, width, height, fps);
+            StartProcess(args);
+        }
+
+        _isEncoding = true;
+
+        return Task.CompletedTask;
+    }
+
+    private void StartProcess(string args)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = "ffmpeg.exe",
@@ -37,52 +68,25 @@ public class FfmpegEncoderService : IVideoEncoderService
             ?? throw new InvalidOperationException("Falha ao iniciar FFmpeg. Verifique se ffmpeg.exe está no PATH.");
 
         _videoInputStream = _ffmpegProcess.StandardInput.BaseStream;
-
-        if (includeAudio)
-        {
-            _audioInputStream = _ffmpegProcess.StandardInput.BaseStream;
-        }
-
-        _isEncoding = true;
-
-        return Task.CompletedTask;
     }
 
-    private string BuildFfmpegArgs(string outputPath, int width, int height, int fps,
-        bool includeAudio, int audioSampleRate, int audioChannels)
+    private string BuildVideoOnlyArgs(string outputPath, int width, int height, int fps)
     {
         var sb = new StringBuilder();
         sb.Append("-y ");
         sb.Append("-f rawvideo ");
         sb.Append("-vcodec rawvideo ");
-        sb.Append($"-pix_fmt bgra ");
+        sb.Append("-pix_fmt bgra ");
         sb.Append($"-s {width}x{height} ");
         sb.Append($"-r {fps} ");
         sb.Append("-i pipe:0 ");
-
-        if (includeAudio)
-        {
-            sb.Append("-f s16le ");
-            sb.Append($"-ar {audioSampleRate} ");
-            sb.Append($"-ac {audioChannels} ");
-            sb.Append("-i pipe:0 ");
-        }
-
         sb.Append("-c:v libx264 ");
         sb.Append("-preset ultrafast ");
         sb.Append("-tune zerolatency ");
         sb.Append("-pix_fmt yuv420p ");
         sb.Append("-crf 18 ");
-
-        if (includeAudio)
-        {
-            sb.Append("-c:a aac ");
-            sb.Append("-b:a 192k ");
-            sb.Append("-shortest ");
-        }
-
+        sb.Append("-an ");
         sb.Append($"\"{outputPath}\"");
-
         return sb.ToString();
     }
 
@@ -100,14 +104,14 @@ public class FfmpegEncoderService : IVideoEncoderService
 
     public async Task EncodeAudioSamplesAsync(byte[] samples, int sampleCount, CancellationToken ct)
     {
-        if (!_isEncoding || _audioInputStream == null) return;
+        if (!_isEncoding || !_includeAudio || string.IsNullOrEmpty(_tempAudioPath)) return;
 
         try
         {
-            await _audioInputStream.WriteAsync(samples, ct);
+            await using var fs = new FileStream(_tempAudioPath, FileMode.Append, FileAccess.Write, FileShare.None, 4096, true);
+            await fs.WriteAsync(samples, ct);
         }
-        catch (IOException) { }
-        catch (ObjectDisposedException) { }
+        catch { }
     }
 
     public Task StopEncodingAsync()
@@ -120,13 +124,11 @@ public class FfmpegEncoderService : IVideoEncoderService
         {
             _videoInputStream?.Flush();
             _videoInputStream?.Close();
-            _audioInputStream?.Close();
 
             if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
             {
                 _ffmpegProcess.StandardInput.Close();
-
-                var exited = _ffmpegProcess.WaitForExit(10000);
+                var exited = _ffmpegProcess.WaitForExit(30000);
                 if (!exited)
                 {
                     _ffmpegProcess.Kill();
@@ -140,11 +142,65 @@ public class FfmpegEncoderService : IVideoEncoderService
             _ffmpegProcess = null;
             _videoInputStream?.Dispose();
             _videoInputStream = null;
-            _audioInputStream?.Dispose();
-            _audioInputStream = null;
+        }
+
+        if (_includeAudio && !string.IsNullOrEmpty(_tempAudioPath) && !string.IsNullOrEmpty(_outputPath))
+        {
+            try
+            {
+                MuxAudioVideo(_outputPath, _tempAudioPath);
+            }
+            catch { }
+            finally
+            {
+                try { File.Delete(_tempAudioPath); } catch { }
+            }
         }
 
         return Task.CompletedTask;
+    }
+
+    private void MuxAudioVideo(string videoPath, string audioRawPath)
+    {
+        if (!File.Exists(audioRawPath) || new FileInfo(audioRawPath).Length == 0) return;
+
+        var audioPath = Path.ChangeExtension(videoPath, ".aac");
+
+        var encodePsi = new ProcessStartInfo
+        {
+            FileName = "ffmpeg.exe",
+            Arguments = $"-y -f s16le -ar {_audioSampleRate} -ac {_audioChannels} -i \"{audioRawPath}\" -c:a aac -b:a 192k \"{audioPath}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true
+        };
+
+        var encodeProcess = Process.Start(encodePsi);
+        encodeProcess?.WaitForExit(30000);
+
+        if (encodeProcess != null && !encodeProcess.HasExited)
+            encodeProcess.Kill();
+        encodeProcess?.Dispose();
+
+        if (!File.Exists(audioPath)) return;
+
+        var muxPsi = new ProcessStartInfo
+        {
+            FileName = "ffmpeg.exe",
+            Arguments = $"-y -i \"{videoPath}\" -i \"{audioPath}\" -c:v copy -c:a aac -shortest \"{videoPath}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true
+        };
+
+        var muxProcess = Process.Start(muxPsi);
+        muxProcess?.WaitForExit(30000);
+
+        if (muxProcess != null && !muxProcess.HasExited)
+            muxProcess.Kill();
+        muxProcess?.Dispose();
+
+        try { File.Delete(audioPath); } catch { }
     }
 
     public void Dispose()
