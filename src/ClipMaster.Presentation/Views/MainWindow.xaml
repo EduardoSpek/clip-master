@@ -6,7 +6,6 @@
         Title="Clip Master" Height="680" Width="520"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource PrimaryBackground}"
-        Icon="pack://application:,,,/ClipMaster;component/ClipMaster.ico"
         ResizeMode="CanMinimize"
         ShowInTaskbar="True">
 
@@ -34,7 +33,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <TextBlock Text="🎬" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock Text="&#x1F3AC;" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Clip Master" FontSize="20" FontWeight="Bold"
                                    Foreground="{DynamicResource TextPrimary}"/>
@@ -46,7 +45,7 @@
                            FontSize="18" FontWeight="SemiBold" FontFamily="Consolas"
                            Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center" Margin="0,0,16,0"/>
 
-                <Button Grid.Column="2" Content="☀️" FontSize="16"
+                <Button Grid.Column="2" Content="&#x2600;&#xFE0F;" FontSize="16"
                         Command="{Binding ToggleThemeCommand}"
                         Background="Transparent" BorderThickness="0"
                         Cursor="Hand" FontFamily="Segoe UI Emoji" Width="36" Height="36"/>
@@ -60,7 +59,7 @@
                 <!-- Recording Status Card -->
                 <Border Style="{DynamicResource CardBorder}">
                     <StackPanel>
-                        <TextBlock Text="STATUS DA GRAVAÇÃO" Style="{DynamicResource SectionTitle}"/>
+                        <TextBlock Text="STATUS DA GRAVA&#x00C7;&#x00C3;O" Style="{DynamicResource SectionTitle}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -85,7 +84,7 @@
                 <!-- Main Actions -->
                 <Border Style="{DynamicResource CardBorder}">
                     <StackPanel>
-                        <TextBlock Text="AÇÕES PRINCIPAIS" Style="{DynamicResource SectionTitle}"/>
+                        <TextBlock Text="A&#x00C7;&#x00D5;ES PRINCIPAIS" Style="{DynamicResource SectionTitle}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -93,11 +92,11 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button Grid.Column="0" Content="🔴 Gravar"
+                            <Button Grid.Column="0" Content="&#x1F534; Gravar"
                                     Command="{Binding StartRecordingCommand}"
                                     Style="{DynamicResource ModernButton}"/>
 
-                            <Button Grid.Column="2" Content="📋 Clipar"
+                            <Button Grid.Column="2" Content="&#x1F4CB; Clipar"
                                     Command="{Binding CreateClipCommand}"
                                     Style="{DynamicResource SecondaryButton}"/>
                         </Grid>
@@ -108,11 +107,11 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button Grid.Column="0" Content="🎬 Híbrido"
+                            <Button Grid.Column="0" Content="&#x1F3AC; H&#x00ED;brido"
                                     Command="{Binding StartHybridAsync}"
                                     Style="{DynamicResource SecondaryButton}"/>
 
-                            <Button Grid.Column="2" Content="✂️ Clipar Direto"
+                            <Button Grid.Column="2" Content="&#x2702;&#xFE0F; Clipar Direto"
                                     Command="{Binding ClipAndContinueCommand}"
                                     Style="{DynamicResource SecondaryButton}"/>
                         </Grid>
@@ -134,7 +133,7 @@
                                           Command="{Binding ToggleWebcamCommand}"
                                           Style="{DynamicResource IconToggleButton}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="📷" Margin="0,0,6,0" FontSize="14" VerticalAlignment="Center"/>
+                                    <TextBlock Text="&#x1F4F7;" Margin="0,0,6,0" FontSize="14" VerticalAlignment="Center"/>
                                     <TextBlock Text="Webcam" FontSize="12" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ToggleButton>
@@ -143,7 +142,7 @@
                                           Command="{Binding ToggleMicrophoneCommand}"
                                           Style="{DynamicResource IconToggleButton}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="🎤" Margin="0,0,6,0" FontSize="14" VerticalAlignment="Center"/>
+                                    <TextBlock Text="&#x1F3A4;" Margin="0,0,6,0" FontSize="14" VerticalAlignment="Center"/>
                                     <TextBlock Text="Microfone" FontSize="12" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ToggleButton>
@@ -154,7 +153,7 @@
                 <!-- Quick Actions -->
                 <Border Style="{DynamicResource CardBorder}">
                     <StackPanel>
-                        <TextBlock Text="ATALHOS RÁPIDOS" Style="{DynamicResource SectionTitle}"/>
+                        <TextBlock Text="ATALHOS R&#x00C1;PIDOS" Style="{DynamicResource SectionTitle}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -162,11 +161,11 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Button Grid.Column="0" Content="📁 Abrir Output"
+                            <Button Grid.Column="0" Content="&#x1F4C1; Abrir Output"
                                     Command="{Binding OpenOutputFolderCommand}"
                                     Style="{DynamicResource SecondaryButton}"/>
 
-                            <Button Grid.Column="2" Content="⚙️ Configurações"
+                            <Button Grid.Column="2" Content="&#x2699;&#xFE0F; Configura&#x00E7;&#x00F5;es"
                                     Command="{Binding OpenSettingsCommand}"
                                     Style="{DynamicResource SecondaryButton}"/>
                         </Grid>
@@ -176,7 +175,7 @@
                 <!-- Recent Clips -->
                 <Border Style="{DynamicResource CardBorder}">
                     <StackPanel>
-                        <TextBlock Text="ÚLTIMO CLIPE" Style="{DynamicResource SectionTitle}"/>
+                        <TextBlock Text="&#x00DA;LTIMO CLIPE" Style="{DynamicResource SectionTitle}"/>
                         <TextBlock Text="{Binding LastClipPath, FallbackValue='Nenhum clipe ainda'}"
                                    Foreground="{DynamicResource TextSecondary}" FontSize="12"
                                    TextTrimming="CharacterEllipsis"/>
@@ -198,9 +197,9 @@
                            Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Content="📥 Minimizar" Command="{Binding MinimizeToTrayCommand}"
+                    <Button Content="&#x1F4E5; Minimizar" Command="{Binding MinimizeToTrayCommand}"
                             Style="{DynamicResource SecondaryButton}" Padding="12,6" FontSize="11" Margin="0,0,8,0"/>
-                    <Button Content="✕ Fechar" Command="{Binding CloseAppCommand}"
+                    <Button Content="&#x2715; Fechar" Command="{Binding CloseAppCommand}"
                             Background="{DynamicResource DangerColor}" Foreground="White"
                             BorderThickness="0" Padding="12,6" FontSize="11" Cursor="Hand"/>
                 </StackPanel>
