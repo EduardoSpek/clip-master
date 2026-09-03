@@ -18,8 +18,9 @@
                 MouseLeftButtonUp="WebcamBorder_MouseLeftButtonUp"
                 MouseWheel="WebcamBorder_MouseWheel">
             <Grid>
-                <Ellipse x:Name="WebcamEllipse" Fill="#2A2A4A"/>
-                <TextBlock Text="📷" FontSize="48" HorizontalAlignment="Center"
+                <Ellipse Fill="#2A2A4A"/>
+                <Image x:Name="WebcamImage" Stretch="UniformToFill" IsHitTestVisible="False"/>
+                <TextBlock Text="&#x1F4F7;" FontSize="48" HorizontalAlignment="Center"
                            VerticalAlignment="Center" IsHitTestVisible="False"/>
             </Grid>
         </Border>

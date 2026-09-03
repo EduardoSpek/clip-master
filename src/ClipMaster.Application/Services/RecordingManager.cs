@@ -63,18 +63,23 @@ public class RecordingManager : IDisposable
         if (_isContinuousCaptureRunning) return;
 
         var settings = _settingsService.Load();
-
         _cts = new CancellationTokenSource();
 
         await _screenCapture.StartAsync(settings.Width, settings.Height, settings.Fps, _cts.Token);
 
         if (settings.MicrophoneEnabled && _micAudio != null)
         {
-            await _micAudio.StartAsync(44100, 1, _cts.Token);
+            try
+            {
+                await _micAudio.StartAsync(44100, 1, _cts.Token);
+            }
+            catch (Exception ex)
+            {
+                ErrorOccurred?.Invoke(this, $"Aviso: microfone não iniciado: {ex.Message}");
+            }
         }
 
         _captureTask = Task.Run(() => CaptureLoopAsync(_cts.Token));
-
         _isContinuousCaptureRunning = true;
 
         State = RecordingState.Recording;
@@ -87,7 +92,7 @@ public class RecordingManager : IDisposable
         var frameIntervalMs = 1000.0 / settings.Fps;
 
         var wallClock = Stopwatch.StartNew();
-        long frameIndex = 0;
+        long encodedFrameCount = 0;
 
         while (!ct.IsCancellationRequested)
         {
@@ -103,6 +108,8 @@ public class RecordingManager : IDisposable
                     audioData = await _micAudio.CaptureSamplesAsync(ct);
                     audioSampleCount = audioData.Length / 2;
                 }
+
+                bool hasVideo = videoFrame.VideoData.Length > 0;
 
                 var frame = new TimestampedFrame
                 {
@@ -121,7 +128,7 @@ public class RecordingManager : IDisposable
                     _audioBuffer.Add(frame);
                 }
 
-                if (_isDirectRecording && _directEncoder != null && _directEncoder.IsEncoding)
+                if (_isDirectRecording && _directEncoder != null && _directEncoder.IsEncoding && hasVideo)
                 {
                     await _directEncoder.EncodeVideoFrameAsync(videoFrame.VideoData, ct);
                     if (audioData.Length > 0)
@@ -139,7 +146,7 @@ public class RecordingManager : IDisposable
                     RecordingTimeUpdated?.Invoke(this, elapsed);
                 }
 
-                if (_isHybridMode && _directEncoder != null && _directEncoder.IsEncoding)
+                if (_isHybridMode && _directEncoder != null && _directEncoder.IsEncoding && hasVideo)
                 {
                     await _directEncoder.EncodeVideoFrameAsync(videoFrame.VideoData, ct);
                     if (audioData.Length > 0)
@@ -150,8 +157,12 @@ public class RecordingManager : IDisposable
                     RecordingTimeUpdated?.Invoke(this, DateTime.Now - _directRecordingStartTime);
                 }
 
-                frameIndex++;
-                var expectedMs = frameIndex * frameIntervalMs;
+                if (hasVideo)
+                {
+                    encodedFrameCount++;
+                }
+
+                var expectedMs = encodedFrameCount * frameIntervalMs;
                 var actualMs = wallClock.ElapsedMilliseconds;
                 var sleepMs = (int)(expectedMs - actualMs);
 
@@ -227,7 +238,7 @@ public class RecordingManager : IDisposable
         var outputPath = _fileManager.GenerateRecordingPath();
 
         _directEncoder = _encoderFactory();
-        var includeAudio = settings.MicrophoneEnabled;
+        var includeAudio = settings.MicrophoneEnabled && _micAudio != null && _micAudio.IsCapturing;
 
         await _directEncoder.StartEncodingAsync(
             outputPath,
@@ -292,7 +303,7 @@ public class RecordingManager : IDisposable
         var outputPath = _fileManager.GenerateHybridPath();
 
         _directEncoder = _encoderFactory();
-        var includeAudio = settings.MicrophoneEnabled;
+        var includeAudio = settings.MicrophoneEnabled && _micAudio != null && _micAudio.IsCapturing;
 
         await _directEncoder.StartEncodingAsync(
             outputPath,
@@ -411,8 +422,15 @@ public class RecordingManager : IDisposable
         if (_micAudio == null) return;
         if (_micAudio.IsCapturing) return;
 
-        var ct = _cts?.Token ?? CancellationToken.None;
-        await _micAudio.StartAsync(44100, 1, ct);
+        try
+        {
+            var ct = _cts?.Token ?? CancellationToken.None;
+            await _micAudio.StartAsync(44100, 1, ct);
+        }
+        catch (Exception ex)
+        {
+            ErrorOccurred?.Invoke(this, $"Erro ao ligar microfone: {ex.Message}");
+        }
     }
 
     public void DisableMicrophone()

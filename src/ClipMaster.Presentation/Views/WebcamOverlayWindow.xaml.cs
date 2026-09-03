@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace ClipMaster.Presentation.Views;
 
@@ -8,12 +10,59 @@ public partial class WebcamOverlayWindow : Window
 {
     private bool _isDragging;
     private Point _dragOffset;
+    private WriteableBitmap? _bitmap;
 
     public WebcamOverlayWindow()
     {
         InitializeComponent();
         Left = 50;
         Top = 50;
+    }
+
+    public void UpdateFrame(byte[] bgr24Data, int width, int height)
+    {
+        if (bgr24Data.Length < width * height * 3) return;
+
+        Dispatcher.Invoke(() =>
+        {
+            if (_bitmap == null || _bitmap.PixelWidth != width || _bitmap.PixelHeight != height)
+            {
+                _bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr24, null);
+                WebcamImage.Source = _bitmap;
+            }
+
+            _bitmap.Lock();
+
+            var srcStride = width * 3;
+            var dstStride = _bitmap.BackBufferStride;
+            var srcOffset = 0;
+            var dstOffset = _bitmap.BackBuffer;
+
+            for (int y = 0; y < height; y++)
+            {
+                unsafe
+                {
+                    fixed (byte* srcPtr = &bgr24Data[srcOffset])
+                    {
+                        Buffer.MemoryCopy(srcPtr, (void*)(dstOffset + y * dstStride), dstStride, srcStride);
+                    }
+                }
+                srcOffset += srcStride;
+            }
+
+            _bitmap.AddDirtyRect(new Int32Rect(0, 0, width, height));
+            _bitmap.Unlock();
+        });
+    }
+
+    public void ShowOverlay()
+    {
+        Show();
+    }
+
+    public void HideOverlay()
+    {
+        Hide();
     }
 
     private void WebcamBorder_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -63,8 +112,8 @@ public partial class WebcamOverlayWindow : Window
     {
         try
         {
-            var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hexColor);
-            WebcamBorder.BorderBrush = new System.Windows.Media.SolidColorBrush(color);
+            var color = (Color)ColorConverter.ConvertFromString(hexColor);
+            WebcamBorder.BorderBrush = new SolidColorBrush(color);
         }
         catch { }
     }

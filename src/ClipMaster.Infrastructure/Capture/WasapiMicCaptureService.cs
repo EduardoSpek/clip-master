@@ -18,37 +18,54 @@ public class WasapiMicCaptureService : IAudioCaptureService
     {
         if (_isCapturing) return Task.CompletedTask;
 
-        try
+        var enumerator = new MMDeviceEnumerator();
+        var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
+
+        var formats = new[]
         {
-            var enumerator = new MMDeviceEnumerator();
-            var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
+            new WaveFormat(sampleRate, 16, channels),
+            new WaveFormat(48000, 16, channels),
+            new WaveFormat(44100, 16, channels),
+            new WaveFormat(48000, 16, 2),
+            new WaveFormat(44100, 16, 2)
+        };
 
-            _capture = new WasapiCapture(device, false, 100);
-            _capture.WaveFormat = new WaveFormat(sampleRate, 16, channels);
+        Exception? lastError = null;
 
-            _capture.DataAvailable += (s, e) =>
+        foreach (var fmt in formats)
+        {
+            try
             {
-                if (e.BytesRecorded > 0)
+                _capture = new WasapiCapture(device, false, 100);
+                _capture.WaveFormat = fmt;
+
+                _capture.DataAvailable += (s, e) =>
                 {
-                    var data = new byte[e.BytesRecorded];
-                    Array.Copy(e.Buffer, data, e.BytesRecorded);
-                    lock (_lock)
+                    if (e.BytesRecorded > 0)
                     {
-                        _latestSamples = data;
+                        var data = new byte[e.BytesRecorded];
+                        Array.Copy(e.Buffer, data, e.BytesRecorded);
+                        lock (_lock)
+                        {
+                            _latestSamples = data;
+                        }
                     }
-                }
-            };
+                };
 
-            _capture.StartRecording();
-            _isCapturing = true;
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                $"Não foi possível capturar áudio do microfone. Detalhes: {ex.Message}", ex);
+                _capture.StartRecording();
+                _isCapturing = true;
+                return Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+                _capture?.Dispose();
+                _capture = null;
+            }
         }
 
-        return Task.CompletedTask;
+        throw new InvalidOperationException(
+            $"Não foi possível capturar áudio do microfone com nenhum formato suportado. Último erro: {lastError?.Message}", lastError);
     }
 
     public Task<byte[]> CaptureSamplesAsync(CancellationToken ct)
@@ -65,7 +82,11 @@ public class WasapiMicCaptureService : IAudioCaptureService
     public void Stop()
     {
         _isCapturing = false;
-        _capture?.StopRecording();
+        try
+        {
+            _capture?.StopRecording();
+        }
+        catch { }
     }
 
     public void Dispose()

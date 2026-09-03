@@ -7,6 +7,7 @@ using ClipMaster.Application.Services;
 using ClipMaster.Domain.Entities;
 using ClipMaster.Domain.Enums;
 using ClipMaster.Domain.Interfaces;
+using ClipMaster.Infrastructure.Capture;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -18,6 +19,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly ISettingsService _settingsService;
     private readonly IFileManagerService _fileManager;
     private readonly DispatcherTimer _uiTimer;
+    private readonly DispatcherTimer _webcamTimer;
+
+    private Views.WebcamOverlayWindow? _webcamWindow;
+    private Infrastructure.Capture.MfWebcamCaptureService? _webcamCapture;
+    private CancellationTokenSource? _webcamCts;
 
     [ObservableProperty] private string _statusText = "Pronto";
     [ObservableProperty] private string _recordingTime = "00:00:00";
@@ -57,6 +63,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _uiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _uiTimer.Tick += (s, e) => { };
         _uiTimer.Start();
+
+        _webcamTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
+        _webcamTimer.Tick += WebcamTimer_Tick;
     }
 
     [RelayCommand]
@@ -156,7 +165,80 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ToggleWebcam()
     {
         IsWebcamOn = !IsWebcamOn;
-        StatusText = IsWebcamOn ? "Webcam ligada" : "Webcam desligada";
+
+        if (IsWebcamOn)
+        {
+            StartWebcam();
+        }
+        else
+        {
+            StopWebcam();
+        }
+    }
+
+    private void StartWebcam()
+    {
+        try
+        {
+            var settings = _settingsService.Load();
+            _webcamCts = new CancellationTokenSource();
+            _webcamCapture = new MfWebcamCaptureService();
+
+            _webcamWindow = new Views.WebcamOverlayWindow();
+            _webcamWindow.SetSize(settings.Webcam.Size);
+            _webcamWindow.SetBorderColor(settings.Webcam.BorderColor);
+            _webcamWindow.Show();
+
+            _webcamCapture.StartAsync(320, 240, _webcamCts.Token).Wait(2000);
+            _webcamTimer.Start();
+
+            StatusText = "Webcam ligada";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Erro webcam: {ex.Message}";
+            StopWebcam();
+        }
+    }
+
+    private void StopWebcam()
+    {
+        _webcamTimer.Stop();
+
+        _webcamCts?.Cancel();
+        _webcamCts?.Dispose();
+        _webcamCts = null;
+
+        _webcamCapture?.Stop();
+        _webcamCapture?.Dispose();
+        _webcamCapture = null;
+
+        if (_webcamWindow != null)
+        {
+            _webcamWindow.Close();
+            _webcamWindow = null;
+        }
+
+        StatusText = "Webcam desligada";
+    }
+
+    private async void WebcamTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_webcamCapture == null || _webcamWindow == null) return;
+
+        try
+        {
+            if (_webcamCapture.IsCapturing)
+            {
+                var ct = _webcamCts?.Token ?? CancellationToken.None;
+                var frame = await _webcamCapture.CaptureFrameAsync(ct);
+                if (frame.VideoData.Length > 0)
+                {
+                    _webcamWindow.UpdateFrame(frame.VideoData, frame.Width, frame.Height);
+                }
+            }
+        }
+        catch { }
     }
 
     [RelayCommand]
@@ -169,15 +251,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
             settings.MicrophoneEnabled = IsMicOn;
             _settingsService.Save(settings);
 
-            if (_recordingManager.IsContinuousCaptureRunning)
+            if (IsMicOn)
             {
-                if (IsMicOn)
+                if (_recordingManager.IsContinuousCaptureRunning)
+                {
                     await _recordingManager.EnableMicrophoneAsync();
-                else
-                    _recordingManager.DisableMicrophone();
+                }
+                StatusText = "Microfone ligado";
             }
-
-            StatusText = IsMicOn ? "Microfone ligado" : "Microfone desligado";
+            else
+            {
+                if (_recordingManager.IsContinuousCaptureRunning)
+                {
+                    _recordingManager.DisableMicrophone();
+                }
+                StatusText = "Microfone desligado";
+            }
         }
         catch (Exception ex)
         {
@@ -240,6 +329,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void CloseApp()
     {
+        StopWebcam();
         _recordingManager.StopAll();
         System.Windows.Application.Current.Shutdown();
     }
@@ -286,6 +376,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _uiTimer.Stop();
+        _webcamTimer.Stop();
+        StopWebcam();
         _recordingManager.StateChanged -= OnStateChanged;
         _recordingManager.ClipSaved -= OnClipSaved;
         _recordingManager.ErrorOccurred -= OnError;
