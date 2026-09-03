@@ -6,13 +6,20 @@ namespace ClipMaster.Presentation.Views;
 
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel _viewModel;
+    private MainViewModel? _viewModel;
 
     public MainWindow()
     {
         InitializeComponent();
-        _viewModel = new MainViewModel();
-        DataContext = _viewModel;
+        try
+        {
+            _viewModel = new MainViewModel();
+            DataContext = _viewModel;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Init Error:\n{ex}", "ClipMaster", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
 
         Closing += MainWindow_Closing;
         StateChanged += MainWindow_StateChanged;
@@ -20,7 +27,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        _viewModel.Dispose();
+        _viewModel?.Dispose();
     }
 
     private void MainWindow_StateChanged(object? sender, EventArgs e)
